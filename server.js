@@ -4,7 +4,6 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 const fs = require('fs');
 const path = require('path');
-const FormData = require('form-data');
 
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -13,7 +12,6 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const TMP = '/tmp';
-const KIE_API_KEY = 'd837781fb3108b0695fec1f5acc1e908';
 
 async function downloadFile(url, dest) {
   const response = await axios({ url, responseType: 'stream' });
@@ -25,34 +23,20 @@ async function downloadFile(url, dest) {
   });
 }
 
-async function uploadToKie(filePath) {
-  const form = new FormData();
-  form.append('file', fs.createReadStream(filePath), 'final.mp4');
-  form.append('uploadPath', 'video');
-
-  const response = await axios.post(
-    'https://kieai.erweima.ai/api/v1/file-stream-upload',
-    form,
-    {
-      headers: {
-        ...form.getHeaders(),
-        'Authorization': `Bearer ${KIE_API_KEY}`
-      }
-    }
-  );
-
-  return response.data.data.url;
-}
+// Serve finished videos
+app.use('/videos', express.static(TMP));
 
 app.post('/stitch', async (req, res) => {
   const { scene1_video_url, scene2_video_url, audio_url } = req.body;
 
-  const scene1Path = path.join(TMP, 'scene1.mp4');
-  const scene2Path = path.join(TMP, 'scene2.mp4');
-  const audioPath = path.join(TMP, 'audio.mpga');
-  const listPath  = path.join(TMP, 'list.txt');
-  const combinedPath = path.join(TMP, 'combined.mp4');
-  const outputPath   = path.join(TMP, 'final.mp4');
+  const timestamp = Date.now();
+  const scene1Path  = path.join(TMP, `scene1_${timestamp}.mp4`);
+  const scene2Path  = path.join(TMP, `scene2_${timestamp}.mp4`);
+  const audioPath   = path.join(TMP, `audio_${timestamp}.mpga`);
+  const listPath    = path.join(TMP, `list_${timestamp}.txt`);
+  const combinedPath = path.join(TMP, `combined_${timestamp}.mp4`);
+  const outputName  = `final_${timestamp}.mp4`;
+  const outputPath  = path.join(TMP, outputName);
 
   try {
     console.log('Downloading files...');
@@ -94,9 +78,7 @@ app.post('/stitch', async (req, res) => {
         .run();
     });
 
-    console.log('Uploading to KIE...');
-    const videoUrl = await uploadToKie(outputPath);
-
+    const videoUrl = `https://tiktok-ffmpeg-server.onrender.com/videos/${outputName}`;
     console.log('Done:', videoUrl);
     res.json({ url: videoUrl });
 
@@ -104,7 +86,7 @@ app.post('/stitch', async (req, res) => {
     console.error('Error:', err);
     res.status(500).json({ error: err.message });
   } finally {
-    [scene1Path, scene2Path, audioPath, listPath, combinedPath, outputPath]
+    [scene1Path, scene2Path, audioPath, listPath, combinedPath]
       .forEach(f => fs.unlink(f, () => {}));
   }
 });
