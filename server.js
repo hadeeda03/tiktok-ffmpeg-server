@@ -1,8 +1,11 @@
 const express = require('express');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
 const fs = require('fs');
 const path = require('path');
+
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const app = express();
 app.use(express.json());
