@@ -23,20 +23,18 @@ async function downloadFile(url, dest) {
   });
 }
 
-// Serve finished videos
 app.use('/videos', express.static(TMP));
 
 app.post('/stitch', async (req, res) => {
   const { scene1_video_url, scene2_video_url, audio_url } = req.body;
 
   const timestamp = Date.now();
-  const scene1Path  = path.join(TMP, `scene1_${timestamp}.mp4`);
-  const scene2Path  = path.join(TMP, `scene2_${timestamp}.mp4`);
-  const audioPath   = path.join(TMP, `audio_${timestamp}.mpga`);
-  const listPath    = path.join(TMP, `list_${timestamp}.txt`);
+  const scene1Path   = path.join(TMP, `scene1_${timestamp}.mp4`);
+  const scene2Path   = path.join(TMP, `scene2_${timestamp}.mp4`);
+  const audioPath    = path.join(TMP, `audio_${timestamp}.mpga`);
   const combinedPath = path.join(TMP, `combined_${timestamp}.mp4`);
-  const outputName  = `final_${timestamp}.mp4`;
-  const outputPath  = path.join(TMP, outputName);
+  const outputName   = `final_${timestamp}.mp4`;
+  const outputPath   = path.join(TMP, outputName);
 
   try {
     console.log('Downloading files...');
@@ -46,14 +44,20 @@ app.post('/stitch', async (req, res) => {
       downloadFile(audio_url, audioPath)
     ]);
 
-    fs.writeFileSync(listPath, `file '${scene1Path}'\nfile '${scene2Path}'`);
-
     console.log('Concatenating videos...');
     await new Promise((resolve, reject) => {
       ffmpeg()
-        .input(listPath)
-        .inputOptions(['-f concat', '-safe 0'])
-        .outputOptions(['-c copy'])
+        .input(scene1Path)
+        .input(scene2Path)
+        .complexFilter([
+          '[0:v][1:v]concat=n=2:v=1:a=0[outv]'
+        ])
+        .outputOptions([
+          '-map [outv]',
+          '-c:v libx264',
+          '-preset fast',
+          '-crf 23'
+        ])
         .output(combinedPath)
         .on('end', resolve)
         .on('error', reject)
@@ -86,7 +90,7 @@ app.post('/stitch', async (req, res) => {
     console.error('Error:', err);
     res.status(500).json({ error: err.message });
   } finally {
-    [scene1Path, scene2Path, audioPath, listPath, combinedPath]
+    [scene1Path, scene2Path, audioPath, combinedPath]
       .forEach(f => fs.unlink(f, () => {}));
   }
 });
