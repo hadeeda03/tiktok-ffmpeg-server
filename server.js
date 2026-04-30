@@ -72,7 +72,6 @@ app.post('/stitch', async (req, res) => {
         .outputOptions([
           '-c:v copy',
           '-c:a aac',
-          '-shortest',
           '-map 0:v:0',
           '-map 1:a:0'
         ])
